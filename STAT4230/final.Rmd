@@ -1,0 +1,186 @@
+---
+title: "final"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+##setwd("C:/Users/ShinJiyoon/OneDrive/바탕 화면/uga fall 2024/STAT4230/final")
+```
+
+
+### **Problem 1.**
+When participants are unable to eat for long periods of time, they must receive parenteral nutrition (fed intravenously). Such patients often show increased calcium loss in their urine, sometimes losing more calcium than they receive in their intravenous fluids. Calcium loss may contribute to bone loss as the body draws calcium from the bones to maintain calcium level in the blood within normal ranges. Potential confounding variables include glomerular filtration rate, dietary sodium, and dietary protein. These data are stored in file P1.txt, and are in 5 columns: column 1) Urinary Calcium $y$, column 2) Dietary Calcium $x_1$, column 3) Filtration Rate $x_2$, column 4) Urinary Sodium $x_3$, column 5) Dietary Protein $x_4$. Consider independent variables $x_1, x_2, x_3$ and $x_4$ in an all-possible-regressions selection procedure.
+
+(a) How many models for $E(y)$ are possible in total?
+```{r}
+2**4 - 1
+```
+
+(b) For each case in part (a), use a statistical software package to find the maximum $R^2$, minimum $C_p$, and minimum $PRESS$.
+```{r}
+data_p1 <- read.table("P1.txt", header=TRUE, sep=" ")
+head(data_p1)
+```
+```{r}
+variables <- c("X1", "X2", "X3", "X4")
+combinations <- unlist(lapply(1:length(variables),
+                              function(x) combn(variables, x, simplify=FALSE)), recursive=FALSE)
+combinations
+```
+```{r}
+library(DAAG)
+
+results <- data.frame()
+
+for (combo in combinations) {
+  formula <- as.formula(paste("Y ~ ", paste(combo, collapse="+")))
+  
+  model <- lm(formula, data=data_p1)
+  
+  r_squared <- summary(model)$r.squared
+  MSE <- summary(model)$sigma^2
+  n <- length(data_p1$Y)
+  p <- length(coef(model)) - 1
+  Cp <- MSE*model$df.residual / (summary(lm(Y~X1+X2+X3+X4,data=data_p1))$sigma^2) - n + 2*(p+1)
+  press <- press(model)
+  
+  results <- rbind(results,
+                   data.frame(
+                     variables = paste(combo, collapse=", "),
+                     rSquared = r_squared,
+                     Cp = Cp,
+                     press = press
+                   ))
+}
+
+results
+```
+
+```{r}
+row_index_r2_max = which.max(results$rSquared)
+row_index_cp_min = which.min(results$Cp)
+row_index_press_min = which.min(results$press)
+
+print(paste("maximum R squared: (", results$variables[row_index_r2_max], ") ", results$rSquared[row_index_r2_max]))
+print(paste("minimum Cp:        (", results$variables[row_index_cp_min], ") ", results$Cp[row_index_cp_min]))
+print(paste("minimum PRESS:     (", results$variables[row_index_press_min], ") ", results$press[row_index_press_min]))
+
+```
+
+(c) Plot each of the quantities $R^2, C_p,$ and $PRESS$ in part (b) against $p$, the number of independent variables in the subset model.
+```{r}
+library(leaps)
+subsets <- regsubsets(Y ~ X1+X2+X3+X4, data=data_p1)
+plot(subsets, scale="r2")
+plot(subsets, scale="Cp")
+```
+
+(d) Based on the plots in part (c), which variables would you select under criterions $R^2, C_p,$ and $PRESS$, respectively?
+
+- The model with all 4 variables $X_1, X_2, X_3, X_4$ achieves the highest $R^2$.
+- The model with all 4 variables $X_1, X_2, X_3, X_4$ does not have the lowest $C_p$, but it is the closest to $p+1$, indicating that it may be the most appropriate model.
+- The model with 2 variables $X_1, X_3$ achieves the lowest $PRESS$.
+
+(e) Based on the best variables you choose under criterion $R^2$, fit a multiple linear model and plot the summary table.
+```{r}
+model_p1 <- lm(Y ~ X1+X2+X3+X4, data=data_p1)
+summary(model_p1)
+```
+
+
+### **Problem 2.**
+It has been suggested that central nervous system malformations in newborns may be related to the hardness of water supplies. Data on the number of central nervous system malformations per 1000 births, and water hardness (in ppm) were collected from 20 geographic regions. These data are stored in P2.txt with two columns: column 1) malformation rate $y$ (per 1000 birhts), and column 2) hardness $x$ (ppm).
+
+(a) Fit the first-order model to the data.
+```{r}
+data_p2 <- read.table("P2.txt", header=TRUE, sep=" ")
+data_p2
+```
+```{r}
+model_p2 <- lm(Y~X, data=data_p2)
+summary(model_p2)
+```
+(b) Calculate the residuals and construct a residual plot versus $\hat y$.
+```{r}
+residuals(model_p2)
+```
+```{r}
+plot(fitted(model_p2), residuals(model_p2), xlab="predicted y", ylab="residuals")
+abline(h=0, col="red")
+```
+
+(c) What does the plot from part (b) suggest about the variance of $y$? What are three potential solutions you could stabilize the variances?
+- The residual plot shows that the variance increases as the $\hat y$ increases. This suggests a funnel-shaped pattern, indicating non-constant variance of residuals.
+- Three potential solutions to stabilize the variances are:
+  - Try transformation on $y$, starting with a log transformation.
+  - If the log transformation does not stabilize the variance, move on to a box-cox-transformation.
+  - If these transformations are not working, apply weighted least squares regression or robust regression.
+  
+(d) Refit the model using all the three variance-stabilizing transformation methods in part (c). Plot the residuals for all the transformed models and compare to the plot obtained in part (b). Get a brief summary.
+- squared root transformation
+```{r}
+data_p2$Y_sqrt <- sqrt(data_p2$Y)
+data_p2
+```
+
+```{r}
+model_p2_sqrt <- lm(Y_sqrt ~ X, data=data_p2)
+plot(fitted(model_p2_sqrt), residuals(model_p2_sqrt), xlab="predicted y transformed(sqrt)", ylab="residuals")
+abline(h=0, col="red")
+```
+
+Still shows a funnel-shaped pattern. This indicates the square root transformation is not effective.
+
+- log transformation
+```{r}
+data_p2$Y_log <- log(data_p2$Y)
+data_p2
+```
+```{r}
+model_p2_log <- lm(Y_log ~ X, data=data_p2)
+plot(fitted(model_p2_log), residuals(model_p2_log), xlab="predicted y transformed(log)", ylab="residuals")
+abline(h=0, col="red")
+```
+
+It demonstrates a more stabilized variance compared to the origin data but still shows a slightly funnel-shaped pattern.
+
+- box-cox transformation
+```{r}
+# find out optimal lambda
+library(MASS)
+boxcox_result <- boxcox(model_p2, lambda=seq(-2, 2, by=0.1))
+
+(optimal_lambda <- boxcox_result$x[which.max(boxcox_result$y)])
+```
+```{r}
+if (optimal_lambda == 0) {
+  data_p2$Y_boxcox <- log(data_p2$Y)
+} else {
+  data_p2$Y_boxcox <- (data_p2$Y ** optimal_lambda - 1) / optimal_lambda
+}
+```
+
+
+```{r}
+model_p2_boxcox <- lm(Y_boxcox ~ X, data=data_p2)
+plot(fitted(model_p2_boxcox), residuals(model_p2_boxcox), xlab="predicted y transformed(box-cox)", ylab="residuals")
+abline(h=0, col="red")
+```
+
+This demonstrates a more stabilized variance compared to the log transformation, suggesting an improved model fit.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
